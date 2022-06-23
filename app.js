@@ -1,14 +1,91 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
+const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
 
 const app = express();
 
+mongoose.connect("mongodb://localhost:27017/SecretUserDB", {
+  useNewUrlParser: true,
+});
+
+const userSchema = new mongoose.Schema({
+  email: String,
+  password: String,
+});
+
+const secret = "Long Live India";
+userSchema.plugin(encrypt, { secret: secret , encryptedFields: ["password"]});
+
+const User = mongoose.model("User", userSchema);
+
+
+
 app.use(express.static("public"));
 app.set("view engine", "ejs");
-app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.urlencoded({ extended: true }));
 
+app.get("/", function (req, res) {
+  res.render("home");
+});
 
-app.listen(5000, function(){
-    console.log("Server started at port 5000");
+app.get("/login", function (req, res) {
+  res.render("login");
+});
+
+app.get("/register", function (req, res) {
+  res.render("register");
+});
+
+app.post("/register", function (req, res) {
+  const newUser = new User({
+    email: req.body.email,
+    password: req.body.password
+  });
+
+  newUser.save(function(err){
+    if(err)
+    {
+        console.log(err);
+    }
+    else
+    {
+        res.render("secrets");
+    }
+  });
+
+});
+
+app.post("/login", function(req, res){
+
+    User.findOne({ email: req.body.email }, function (err, foundUser){
+        if(err)
+        {
+            console.log(err);
+        }
+        else
+        {
+            if(foundUser)
+            {
+                if(foundUser.password === req.body.password)
+                {
+                    res.render("secrets");
+                }
+                else
+                {
+                    res.send("Enter correct credentials");
+                }
+                
+            }
+            else
+            {
+                res.send("Enter correct credentials");
+            }
+        }
+    });
+})
+
+app.listen(5000, function () {
+  console.log("Server started at port 5000");
 });
