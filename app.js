@@ -6,7 +6,10 @@ const mongoose = require("mongoose");
 
 // const encrypt = require("mongoose-encryption"); // -------Use of mongoose encryption
 
-const md5 = require("md5"); // Hashing Technique
+// const md5 = require("md5"); // ---------------Hashing Technique
+
+const bcrypt = require("bcrypt"); // -------------Salting and Hashing
+const saltRounds = 10;
 
 const app = express();
 
@@ -16,7 +19,7 @@ mongoose.connect("mongodb://localhost:27017/SecretUserDB", {
 
 const userSchema = new mongoose.Schema({
   email: String,
-  password: String
+  password: String,
 });
 
 // --------------Mongoose encryption applied
@@ -24,8 +27,6 @@ const userSchema = new mongoose.Schema({
 // userSchema.plugin(encrypt, { secret: process.env.SECRET , encryptedFields: ["password"]});
 
 const User = mongoose.model("User", userSchema);
-
-
 
 app.use(express.static("public"));
 app.set("view engine", "ejs");
@@ -44,52 +45,55 @@ app.get("/register", function (req, res) {
 });
 
 app.post("/register", function (req, res) {
-  const newUser = new User({
-    email: req.body.email,
-    password: md5(req.body.password)
-  });
+  // const newUser = new User({
+  //   email: req.body.email,
+  //   password: md5(req.body.password),
+  // });
 
-  newUser.save(function(err){
-    if(err)
-    {
+  // newUser.save(function (err) {
+  //   if (err) {
+  //     console.log(err);
+  //   } else {
+  //     res.render("secrets");
+  //   }
+  // });
+
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    // Store hash in your password DB.
+    const newUser = new User({
+      email: req.body.email,
+      password: hash,
+    });
+
+    newUser.save(function (err) {
+      if (err) {
         console.log(err);
-    }
-    else
-    {
+      } else {
         res.render("secrets");
-    }
+      }
+    });
   });
-
 });
 
-app.post("/login", function(req, res){
-
-    User.findOne({ email: req.body.email }, function (err, foundUser){
-        if(err)
-        {
-            console.log(err);
-        }
-        else
-        {
-            if(foundUser)
-            {
-                if(foundUser.password === md5(req.body.password))
-                {
-                    res.render("secrets");
-                }
-                else
-                {
-                    res.send("Enter correct credentials");
-                }
-                
-            }
-            else
-            {
-                res.send("Enter correct credentials");
-            }
-        }
-    });
-})
+app.post("/login", function (req, res) {
+  User.findOne({ email: req.body.email }, function (err, foundUser) {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        bcrypt.compare(req.body.password, foundUser.password, function (err, result) {
+          if (result === true) {
+            res.render("secrets");
+          } else {
+            res.send("Enter correct credentials");
+          }
+        });
+      } else {
+        res.send("Enter correct credentials");
+      }
+    }
+  });
+});
 
 app.listen(5000, function () {
   console.log("Server started at port 5000");
